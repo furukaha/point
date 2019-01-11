@@ -1,0 +1,61 @@
+---.bashrc---
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+alias ls='ls -lFG --color=auto'
+alias la='ls -laFG --color=auto'
+alias grep='grep --color=auto'
+alias more='less'
+alias vi='vim'
+alias ccc="clear"
+
+
+---.vimrc---
+"basic
+set nocompatible
+syntax enable
+filetype plugin indent on
+""char
+set enc=utf-8
+set fenc=utf-8
+setlocal textwidth=80
+set formatoptions+=mM
+set ambiwidth=double
+"backupfile
+set nobackup
+set noswapfile
+"cursor
+"set cursorline
+set virtualedit+=block
+"statusline
+set showmatch
+set laststatus=2
+set wildmode=list:longest
+"search
+set ignorecase
+set smartcase
+set incsearch
+set wrapscan
+set hlsearch
+nmap n nzz
+nmap N Nzz
+nmap <Esc><Esc> :nohlsearch<CR><Esc>
+"indent
+set smartindent
+set expandtab
+set shiftwidth=2
+set softtabstop=2
+set tabstop=2
+set guioptions+=a
+"mouse
+"set mouse=a
+"set ttymouse=xterm2
+"keymap
+inoremap <Tab> <C-n>
+nnoremap <C-n> gt
+nnoremap <C-p> gT
+
+
+"éQçlÅFvimÇÃÇ∑ÅTÇﬂ
+"https://www.soum.co.jp/misc/vim-no-susume/1/
+root@ed87b8b1a310:/home/ses_alliance#
