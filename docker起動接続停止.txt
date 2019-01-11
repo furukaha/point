@@ -1,0 +1,81 @@
+#仮想マシン状態確認
+docker-machine.exe ls
+
+#仮想マシン停止
+docker-machine.exe stop
+
+
+---
+#イメージ検索・ダウンロード
+
+#イメージ検索
+docker search [キーワード]
+
+#イメージダウンロード
+docker pull [イメージ名]
+
+#ローカルイメージ一覧
+docker images
+
+#ローカルイメージ削除
+docker rmi [イメージ名]
+
+---
+
+#イメージからコンテナ作成・ログイン（初回のみ）
+docker run -it --name=[コンテナ名] -p 3000:3000 -v [ローカルフォルダ]:[コンテナ内ディレクトリ] [イメージ名] /bin/bash
+ex)docker run -it --name=rails_app -p 3000:3000 -v /c/Users/diginnos/Desktop/app:/home rails /bin/bash
+※[Cドライブ]の[C]は小文字！
+
+#起動しているコンテナ確認
+docker ps 
+※[-a]オプションで終了しているプロセスも表示する
+
+---
+#コンテナ開始・接続・停止
+
+#作成済みのコンテナに接続する
+docker start [コンテナID/名]
+※[-i]オプションでインタラクティブでアタッチする
+
+#開始済みのコンテナにアタッチする
+docker attach [コンテナID/名]
+
+#アタッチ済みのコンテナから抜ける（デタッチ）
+[Ctrl+p]→[Ctrl+q]
+
+#コンテナを停止する
+docker stop [コンテナID/名]
+
+#コンテナから抜けて、コンテナも停止する
+exit
+
+#作成したコンテナの削除
+docker rm [コンテナID/名]
+
+#rails s のアドレスは仮想環境のアドレス:3000
+192.168.99.100:3000
+
+---
+#マルチバイト文字 文字化け対応
+env LANG=ja_JP.UTF8
+export LANG=ja_JP.UTF8
+export LANGUAGE=ja_JP.UTF8
+
+#vim インストール
+apt-get update
+apt-get install vim
+apt-get install exuberant-ctags
+
+#less
+apt install less
+apt install source-highlight
+export LESSOPEN="| /usr/share/source-highlight/src-hilite-lesspipe.sh %s"
+export LESS='-R'
+
+# image magick
+apt-get install imagemagick
+
+#git
+apt-get install git
+
