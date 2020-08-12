@@ -56,6 +56,8 @@ nnoremap <C-n> gt
 nnoremap <C-p> gT
 
 
-"QlFvim‚Ì‚·T‚ß
+"Å½QÂlÂFvimâ€šÃŒâ€šÂ·ÂTâ€šÃŸ
 "https://www.soum.co.jp/misc/vim-no-susume/1/
-root@ed87b8b1a310:/home/ses_alliance#
+
+" :set paste
+" w !ruby %
