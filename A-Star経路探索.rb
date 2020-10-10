@@ -1,175 +1,178 @@
-# coding: Shift_JIS
+class Map
+  attr_reader :start_xy, :goal_xy, :h, :w, :field
 
-class Array
-  #      U:0           R:2         D:4          R:6
-  V8 = [ [0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1] ]
-  D8 = [ "U",   "UR",  "R",  "RD", "D",  "DL",  "L",   "LU" ]
-  def self.new2d(y,x,v=nil) return Array.new(y).map{Array.new(x){v}} end
-  def puts2d(c="") self.each{|r| puts r.join(c)} end
-  def sum2d(arr2d) total=0; arr2d.each do |r| total+=r.sum end; return total end
-  def ave2d(arr2d,n) total=0; arr2d.each do |r| total+=r.sum end; return total/n end
-  def sum() return self.inject(:+) end
-  def deep_dup() return Marshal.load(Marshal.dump(self)) end
-  def to_i() return self.map(&:to_i) end
-  def to_f() return self.map(&:to_f) end
-end
+  WALL = "#"
+  START,GOAL = "S","G"
 
-# ƒAƒ‹ƒSƒŠƒYƒ€ F A*Star Å—ÇŒo˜H’Tõ
-class Code
-  V = Array::V8
-  WALL="#"
   def initialize
-    @w,@h = $stdin.gets.chomp.split.to_i
-    @b =[]; @h.times do |n| @b<<  $stdin.gets.chomp.split("") end
-    @start_xy = find("s")
-    @goal_xy = find("g")
-    # ÀˆÚ“®ƒRƒXƒgA„’èƒRƒXƒgiƒ}ƒ“ƒnƒbƒ^ƒ“‹——£jA–K–âÏ‚İ‚©”Û‚©Ai•K—v‚È‚çˆÚ“®Œ³À•Wj
-    @scores = { @start_xy => [0,0,"open",[nil,nil] ] }
-    @que = {@start_xy =>  0}
-    @init_b = @b.deep_dup
+    @field = read_map()
+    @start_xy = find_xy(START)
+    @goal_xy  = find_xy(GOAL)
+    @h,@w = set_mapsize
+    @initial_field = Marshal.load(Marshal.dump(@field))
   end
-  def run
-    display_field(*@start_xy,"START")
-    x,y = run_loop
-    display_field(*@goal_xy,"GOAL")
-    puts @scores[@goal_xy] ? @scores[ @goal_xy ][0] : "Fail" #cost
+
+  # DATAå®šæ•°ã‹ã‚‰æ–‡å­—åˆ—åœ°å›³ã‚’èª­ã¿å–ã‚‹
+  # äºŒæ¬¡å…ƒé…åˆ—åŒ–ã—ã¦ä¿æŒã™ã‚‹
+  def read_map
+    return DATA.read.split.map{|r|r.split("")}
   end
-  def run_loop
-    # A*Star
-    loop do
-      # Å¬‚ÌƒXƒRƒA‚ğæ‚èo‚·
-      xy,score = min_score #[[1, 0], [0, 0, "open"]]
-      # ƒXƒRƒA‚ª‚È‚¢‚©ƒS[ƒ‹‚É“’B‚µ‚Ä‚¢‚½‚çI‚í‚è
-      return nil if xy.nil?
-      @que.delete(xy)
-      x,y=xy
-      return true if @b[y][x] == "g"
-      # ƒS[ƒ‹‚É’B‚·‚é‚©s‚«~‚Ü‚è‚Ü‚Å
-      return true if goto_goal(x,y)
-    end
-    return nil
-  end
-  def goto_goal(x,y)
-    # ƒS[ƒ‹‚É’B‚·‚é‚©s‚«~‚Ü‚è‚©•ªŠò“_‚Ü‚Å
-    until goal?(x,y) do
-      # –K–âÏ‚İ‚É‚·‚é
-      close!(x,y)
-      # üˆÍ4ƒ}ƒX‚ğƒŠƒXƒg‰»‚µ‚Äæ‚èo‚·
-      positions = look_around(x,y)
-      return false if positions==[]
-      # debug
-      display_field(x,y)
-      # ˆÚ“®‰Â”\‚Èƒ}ƒX‚É‚Â‚¢‚ÄƒXƒRƒAŒvZ
-      calc_score(positions,x,y)
-      stuck_que(positions,x,y)
-      # •ªŠò“_‚È‚ç‹A‚é
-      return false if positions.size >= 2
-      x,y = positions.shift
-    end
-    return true
-  end
-  def stuck_que(positions,x,y)
-    positions.each do |pos|
-      cost = @scores[pos][1] + distance(*pos)
-      @que[pos] = cost
+
+  # äºŒæ¬¡å…ƒé…åˆ—ã®åœ°å›³ã‹ã‚‰
+  # å¼•æ•°ã§æŒ‡å®šã•ã‚ŒãŸè¨˜å·ã®åº§æ¨™ã‚’æ¢ã—ã¦è¿”ã™
+  def find_xy(char)
+    @field.each_with_index do|ar,y|
+      if ar.include?(char) then
+        x = ar.index(char)
+        return [x, y]
+      end
     end
   end
-  def look_around(x,y)
-    # üˆÍ4ƒ}ƒX‚ÌÀ•W‚ğ•Ô‚·
-    # •ÇEŠO‚Å‚ ‚Á‚½‚çœŠO
-    positions=[]
-    0.step(6,+2) do |n|
-      nx = x+V[n][0]; ny = y+V[n][1]
-      next if nx < 0 or ny < 0 or nx >= @w or ny >= @h
-      next if @scores[[nx,ny]]
-      positions << [nx,ny] if @b[ny][nx] != WALL
-    end
-    return positions
+
+  # åœ°å›³ã®ç¸¦æ¨ªã‚µã‚¤ã‚ºã‚’å–å¾—ã—ã¦è¿”ã™
+  def set_mapsize
+    h = @field.size
+    w = @field[0].size
+    return [h, w]
   end
-  def calc_score(positions,px,py)
-    # [ cost, score, "open/close" ]
-    positions.each do |xy|
-      next if @scores[xy] # ÄŒvZ‚µ‚È‚¢
-      cost = @scores[ [px,py] ][0] + 1
-      #score = distance(*xy) + cost
-      score = 0
-      from = [px,py]
-      @scores[xy] = [cost,score,"open",from]
-    end
+
+  def description
+    puts "ã‚¹ã‚¿ãƒ¼ãƒˆåº§æ¨™ã¯ #{@start_xy} ã§ã™"
+    puts "ã‚´ãƒ¼ãƒ«åº§æ¨™ã¯ #{@goal_xy} ã§ã™"
+    puts "åœ°å›³ã®ã‚µã‚¤ã‚ºã¯æ¨ªç¸¦ #{@w} x #{@h} ã§ã™"
+    puts "-"*30
+    puts_map(-1)
   end
-  def distance(x,y)
-    # ƒS[ƒ‹‚Ü‚Å‚Ì’¼ü‹——£‚ğ•Ô‚·i„’èƒRƒXƒgj
-    ans = Math.sqrt( (@goal_xy[0]-x).abs ** 2 + (@goal_xy[1]-y).abs ** 2 )
-    return ans #*10 }Š ‚è’²®
-  end
-  def min_score
-    # Å¬ƒXƒRƒA‚ğ•Ô‚·i–K–âÏ‚İ‚ÍœŠOj
-    return @que.min_by{|k,v| v}
-  end
-  def goal?(x,y)
-    return [x,y]==@goal_xy
-  end
-  def close!(x,y)
-    # –K–âÏ‚İ‚ÉXV
-    @scores[ [x,y] ][2] = "close"
-  end
-  def find(c)
-    # ŠY“–Char‚ÌÀ•W‚ğ•Ô‚·
-    @h.times do |y|
-      x = @b[y].index(c)
-      return [x,y] if x != nil
-    end
-  end
-  def display_field(x,y,msg="")
-    flush!(@h+1) if msg != "START"
-    printf "[ %3d , %3d ] : %-100s \n",x,y,msg
-    @b[y][x]="*"
-    @b[y][x]="S" if [x,y]==@start_xy
-    @b[y][x]="G" if [x,y]==@goal_xy
-    set_route if @scores[@goal_xy]
-    @b.each do |a| puts a.join end
-    sleep 0.1
-  end
-  def set_route
-    @b = @init_b.deep_dup
-    x,y=@goal_xy
-    until x==nil do
-      x,y = @scores[ [x,y] ][3]
-      @b[y][x]="*" if x!=nil and [x,y]!=@start_xy
-    end
-  end
-  def flush!(n)
-    # •W€o—Í‚ÌƒJ[ƒ\ƒ‹ˆÊ’u‚ğ•ÏX‚µ‚Ä flush ‚·‚é / A:U B:D C:R D:L
+
+
+  # åœ°å›³ã‚’è¡¨ç¤ºã™ã‚‹
+  def puts_map(n=@h)
     printf "\e[#{n}A"
     $stdout.flush
+
+    @field.each do |ar|
+      puts ar.join.gsub(/\*/, "\e[32m*\e[0m")
+    end
   end
 end
 
+class Explorer
+  #     UP    RIGHT  DOWN  LEFT
+  V = [ [0,1],[1,0],[0,-1],[-1,0] ]
 
-inputs = <<_EOS
-4 5
-.s.#
-..#.
-.##.
-..#g
-....
-%
-15 12
-.#.s#.#.##.#...
-...##......##.#
-.###g.###.###.#
-....###.#..#...
-#.#......#...#.
-..#.##.#..#.##.
-..##...#.#..##.
-..###.#...#...#
-.####...#####.#
-####..##..#....
-###.#.##.#..##.
-###.........#..
-_EOS
+  def initialize(map)
+    @map = map
+    # æ­©æ•°, ç›´ç·šè·é›¢, ç§»å‹•æ¸ˆã¿ã‹, ç§»å‹•å…ƒåº§æ¨™
+    @memo = { map.start_xy => [ 0, 0, true, [nil,nil] ] }
+  end
 
-inputs.split("%\n").each do |input|
-  $stdin = StringIO.new(input)
-  Code.new.run
+  # è¨ªå•äºˆå®šãƒªã‚¹ãƒˆã‹ã‚‰åº§æ¨™ã‚’1ä»¶å–ã‚Šå‡ºã™(ã‚ªãƒ¼ãƒ—ãƒ³ã‹ã¤ã‚¹ã‚³ã‚¢ã®é«˜ã„åº§æ¨™)
+  # åº§æ¨™ã«ç§»å‹•ã—ã€åº§æ¨™ã‚’ã‚¯ãƒ­ãƒ¼ã‚ºã™ã‚‹
+  def move
+    xy = @memo.select{|k,v|v[2]}.sort_by{|k,v|v[1]}.to_h.keys.shift
+    @memo[xy][2] = false
+    return xy
+  end
+
+  # åº§æ¨™ãŒã‚´ãƒ¼ãƒ«ã‹ã©ã†ã‹ã‚’åˆ¤å®šã™ã‚‹
+  # åº§æ¨™ãŒ nil ã§ã‚ã‚Œã°ç§»å‹•å…ˆãªã—ã¨åˆ¤æ–­ã— true ã‚’è¿”ã™
+  def goal?(xy)
+    return true if xy.nil?
+    return true if @map.goal_xy == xy
+    return false
+  end
+
+  # å‘¨å›²4æ–¹å‘ã®ç§»å‹•å¯èƒ½ãªåº§æ¨™ãƒªã‚¹ãƒˆã‚’ç”Ÿæˆã—ã¦è¿”ã™
+  def look_around(xy)
+    next_xy_list = []
+    V.each do |vx,vy|
+      next_x = xy[0] - vx
+      next_y = xy[1] - vy
+      next_xy_list << [next_x, next_y]
+    end
+
+    # åœ°å›³å¤–ã®åº§æ¨™ã¯é™¤å¤–
+    # ã™ã§ã«ç§»å‹•ã‚³ã‚¹ãƒˆè¨ˆç®—æ¸ˆã¿ã®åº§æ¨™ã¯é™¤å¤–
+    # åœ°å›³ä¸Šã§å£ã§ã‚ã‚Œã°é™¤å¤–
+    next_xy_list.select! do |x,y|
+      x < @map.w and y < @map.h and
+        x >= 0 and y >= 0 and
+        !@memo[[x,y]] and
+        @map.field[y][x] != "#"
+    end
+    return next_xy_list
+  end
+
+  # åº§æ¨™ãƒªã‚¹ãƒˆã‹ã‚‰è¨ªå•äºˆå®šãƒªã‚¹ãƒˆã‚’ä½œæˆã™ã‚‹
+  def calc(xy_list,pxy)
+    steps = @memo[pxy][0] + 1 # å®Ÿæ­©æ•°(ç§»å‹•å…ƒåº§æ¨™ã®æ­©æ•°+1)
+    xy_list.each do |x,y|
+      score = distance(x,y) + steps # æ¨å®šã‚¹ã‚³ã‚¢:ã‚´ãƒ¼ãƒ«ã¾ã§ã®ç›´ç·šè·é›¢+å®Ÿæ­©æ•°
+      memo = [steps, score, true, pxy]
+      @memo[ [x,y] ] = memo
+    end
+  end
+
+  # çµŒè·¯ã‚’å–ã‚Šå‡ºã—ã¦åœ°å›³ã‚’è¡¨ç¤ºã™ã‚‹
+  def check_map(xy)
+    arr = []
+    x,y = xy
+    until [x,y]==@map.start_xy do
+      arr << [x,y]
+      x,y = @memo[ [x,y] ][3]
+    end
+    arr.shift # ã‚´ãƒ¼ãƒ«åº§æ¨™é™¤å¤–
+    arr.each do |x,y|
+      @map.field[y][x] = "*"
+    end
+
+    @map.puts_map
+  end
+
+  private
+
+  # ã‚´ãƒ¼ãƒ«ã¾ã§ã®ç›´ç·šè·é›¢ã‚’è¿”ã™ï¼ˆæ¨å®šã‚³ã‚¹ãƒˆï¼‰
+  def distance(x,y)
+    ans = Math.sqrt( (@map.goal_xy[0]-x).abs ** 2 + (@map.goal_xy[1]-y).abs ** 2 )
+    return ans
+  end
+
 end
+
+
+
+if __FILE__ == $0 then
+  map = Map.new()
+  map.description
+  takashi = Explorer.new(map)
+  xy = takashi.move
+  until takashi.goal?(xy) do
+    next_xy_list = takashi.look_around(xy)
+    takashi.calc(next_xy_list, xy)
+    xy = takashi.move
+    # å®Ÿè¡Œæ™‚ã®å¼•æ•°ã«æ•°å€¤ãŒæŒ‡å®šã•ã‚Œã¦ã„ãŸã‚‰
+    # ãƒªã‚¢ãƒ«ã‚¿ã‚¤ãƒ ã§çµŒéã‚’æå†™ã™ã‚‹
+    if ARGV[0] then
+      takashi.check_map(xy)
+      sleep ARGV[0].to_f
+    end
+  end
+  takashi.check_map(xy)
+end
+
+__END__
+S#G......#.#...
+.#######.#.#.##
+.....#.........
+.....######.###
+.....#.........
+.....#.##.#####
+###..#..###....
+.....#....#.##.
+..#####.#...#..
+......####.####
+.##.###........
+.#....#...#####
+.#.######....#.
+.#....#.####...
+.#..#........#.
