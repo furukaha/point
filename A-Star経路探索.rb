@@ -1,178 +1,175 @@
 class Map
-  attr_reader :start_xy, :goal_xy, :h, :w, :field
+  attr_reader :start_xy, :goal_xy, :field
 
-  WALL = "#"
   START,GOAL = "S","G"
+  WALL = "#"
 
   def initialize
-    @field = read_map()
+    # 地図フィールド情報
+    @field = DATA.read.split.map{|r|r.split("")}
+    # 地図の縦横サイズ
+    @h = @field.size
+    @w = @field[0].size
+    # スタート地点・ゴール地点の座標
     @start_xy = find_xy(START)
-    @goal_xy  = find_xy(GOAL)
-    @h,@w = set_mapsize
-    @initial_field = Marshal.load(Marshal.dump(@field))
+    @goal_xy = find_xy(GOAL)
   end
 
-  # DATA定数から文字列地図を読み取る
-  # 二次元配列化して保持する
-  def read_map
-    return DATA.read.split.map{|r|r.split("")}
+  # 地図の詳細情報を出力する
+  def description
+    puts "地図の縦横サイズは #{@h} x #{@w} です"
+    puts "スタート座標は #{@start_xy} です"
+    puts "ゴール座標は #{@goal_xy} です"
   end
 
-  # 二次元配列の地図から
-  # 引数で指定された記号の座標を探して返す
-  def find_xy(char)
-    @field.each_with_index do|ar,y|
-      if ar.include?(char) then
-        x = ar.index(char)
-        return [x, y]
-      end
+  # 地図のフィールド情報を出力する
+  def puts_field(route=[])
+    # 経路座標に "*" を表示する
+    route.each do |x,y|
+      @field[y][x] = "\e[32m*\e[0m"
+    end
+
+    puts "-" * 30
+    @field.each do |ar|
+      puts ar.join.gsub("."," ")
     end
   end
 
-  # 地図の縦横サイズを取得して返す
-  def set_mapsize
-    h = @field.size
-    w = @field[0].size
-    return [h, w]
+  # 指定の座標が移動可能かどうかを判定する
+  def valid?(x,y)
+    return false if x < 0
+    return false if y < 0
+    return false if x >= @w
+    return false if y >= @h
+    return false if @field[y][x] == WALL
+    return true
   end
 
-  def description
-    puts "スタート座標は #{@start_xy} です"
-    puts "ゴール座標は #{@goal_xy} です"
-    puts "地図のサイズは横縦 #{@w} x #{@h} です"
-    puts "-"*30
-    puts_map(-1)
+  # 指定の座標からゴール座標までの直線距離を算出する
+  def distance2goal(x,y)
+    hen1 = (@goal_xy[0] - x).abs ** 2
+    hen2 = (@goal_xy[1] - y).abs ** 2
+    ans = Math.sqrt( hen1 + hen2 )
+    return ans
   end
 
+  private
 
-  # 地図を表示する
-  def puts_map(n=@h)
-    printf "\e[#{n}A"
-    $stdout.flush
-
-    @field.each do |ar|
-      puts ar.join.gsub(/\*/, "\e[32m*\e[0m")
+  # 指定の記号を検索して、その座標を返す
+  def find_xy(char)
+    @field.each_with_index do |ar,y|
+      if ar.include?(char) then
+        x = ar.index(char)
+        return [x,y]
+      end
     end
   end
 end
 
 class Explorer
-  #     UP    RIGHT  DOWN  LEFT
-  V = [ [0,1],[1,0],[0,-1],[-1,0] ]
+  #     UP     RIGHT  DOWN    LEFT
+  V = [ [0,1], [1,0], [0,-1], [-1,0] ]
 
-  def initialize(map)
-    @map = map
-    # 歩数, 直線距離, 移動済みか, 移動元座標
-    @memo = { map.start_xy => [ 0, 0, true, [nil,nil] ] }
+  def initialize
+    # 地図を手に入れる
+    @map = Map.new
+    @map.description
+    @map.puts_field
+
+    # スタート地点をメモして訪問先リストに登録する
+    @memo = {
+      @map.start_xy => [
+        0, # スタート地点からの実歩数
+        0, # ゴールに近いかどうかの評価(スコア)
+        true, # 移動予定か(移動済みならfalse)
+        [nil,nil] # 移動元座標
+      ]
+    }
   end
 
-  # 訪問予定リストから座標を1件取り出す(オープンかつスコアの高い座標)
-  # 座標に移動し、座標をクローズする
+  # メモからゴールに近い座標をひとつ取り出して
+  # その座標に移動する(移動済みとしてクローズする)
   def move
-    xy = @memo.select{|k,v|v[2]}.sort_by{|k,v|v[1]}.to_h.keys.shift
+    arr = @memo.select{|_,v|v[2]}.sort_by{|_,v|v[1]}
+    xy = arr.to_h.keys.shift
     @memo[xy][2] = false
     return xy
   end
 
-  # 座標がゴールかどうかを判定する
-  # 座標が nil であれば移動先なしと判断し true を返す
-  def goal?(xy)
-    return true if xy.nil?
-    return true if @map.goal_xy == xy
-    return false
-  end
-
-  # 周囲4方向の移動可能な座標リストを生成して返す
+  # 周囲を見渡して訪問予定リストを作成する
+  # 移動不可能であれば除外する
   def look_around(xy)
+    x,y = xy
     next_xy_list = []
     V.each do |vx,vy|
-      next_x = xy[0] - vx
-      next_y = xy[1] - vy
-      next_xy_list << [next_x, next_y]
+      next_x = x + vx
+      next_y = y + vy
+      next_xy_list << [next_x,next_y]
     end
 
-    # 地図外の座標は除外
-    # すでに移動コスト計算済みの座標は除外
-    # 地図上で壁であれば除外
+    # 移動可能な座標だけを抽出する
+    # すでにメモしてある座標は除外する
     next_xy_list.select! do |x,y|
-      x < @map.w and y < @map.h and
-        x >= 0 and y >= 0 and
-        !@memo[[x,y]] and
-        @map.field[y][x] != "#"
+      @map.valid?(x,y) and !@memo[[x,y]]
     end
+
     return next_xy_list
   end
 
-  # 座標リストから訪問予定リストを作成する
-  def calc(xy_list,pxy)
-    steps = @memo[pxy][0] + 1 # 実歩数(移動元座標の歩数+1)
+  # 指定の座標一覧に対してメモを記入する
+  def take_memo(xy_list, pxy)
+    step = @memo[pxy][0] + 1
     xy_list.each do |x,y|
-      score = distance(x,y) + steps # 推定スコア:ゴールまでの直線距離+実歩数
-      memo = [steps, score, true, pxy]
-      @memo[ [x,y] ] = memo
+      score = @map.distance2goal(x,y) + step
+      memo = [step, score, true, pxy]
+      @memo[[x,y]] = memo
     end
+    return @memo
   end
 
-  # 経路を取り出して地図を表示する
-  def check_map(xy)
-    arr = []
-    x,y = xy
-    until [x,y]==@map.start_xy do
-      arr << [x,y]
-      x,y = @memo[ [x,y] ][3]
-    end
-    arr.shift # ゴール座標除外
-    arr.each do |x,y|
-      @map.field[y][x] = "*"
-    end
-
-    @map.puts_map
+  # ゴールしたかどうか判定する
+  def goal?(xy)
+    return true if xy.nil?
+    return true if xy == @map.goal_xy
+    return false
   end
 
-  private
+  # 指定の座標からスタート座標までの経路を返す
+  def select_route(xy)
+    route = []
+    until xy == @map.start_xy do
+      route << xy
+      xy = @memo[xy][3]
+    end
+    route.shift if route[0] == @map.goal_xy
+    route.shift if route[-1] == @map.start_xy
+    p route
+    return route
+  end
 
-  # ゴールまでの直線距離を返す（推定コスト）
-  def distance(x,y)
-    ans = Math.sqrt( (@map.goal_xy[0]-x).abs ** 2 + (@map.goal_xy[1]-y).abs ** 2 )
-    return ans
+  # 地図をチェックする
+  def check_map(route)
+    @map.puts_field(route)
   end
 
 end
 
-
-
 if __FILE__ == $0 then
-  map = Map.new()
-  map.description
-  takashi = Explorer.new(map)
+  takashi = Explorer.new
   xy = takashi.move
+
   until takashi.goal?(xy) do
     next_xy_list = takashi.look_around(xy)
-    takashi.calc(next_xy_list, xy)
+    takashi.take_memo(next_xy_list, xy)
     xy = takashi.move
-    # 実行時の引数に数値が指定されていたら
-    # リアルタイムで経過を描写する
-    if ARGV[0] then
-      takashi.check_map(xy)
-      sleep ARGV[0].to_f
-    end
   end
-  takashi.check_map(xy)
+  route = takashi.select_route(xy)
+  takashi.check_map(route)
+
 end
 
 __END__
-S#G......#.#...
-.#######.#.#.##
-.....#.........
-.....######.###
-.....#.........
-.....#.##.#####
-###..#..###....
-.....#....#.##.
-..#####.#...#..
-......####.####
-.##.###........
-.#....#...#####
-.#.######....#.
-.#....#.####...
-.#..#........#.
+S..#.#G
+.###.#.
+...#.#.
+.#.....
